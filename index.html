@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+  <meta charset="UTF-8" />
+  <title>מחשבון משכנתא - ריבית קבועה ומשתנה</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      direction: rtl;
+      text-align: right;
+      max-width: 900px;
+      margin: auto;
+      padding: 10px;
+    }
+    input, select, button {
+      margin: 5px 0;
+      padding: 5px;
+      font-size: 1rem;
+    }
+    label {
+      display: block;
+      margin: 5px 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      font-size: 0.9rem;
+    }
+    th, td {
+      border: 1px solid #999;
+      padding: 6px;
+      text-align: center;
+    }
+    .summary {
+      font-weight: bold;
+      margin-top: 10px;
+    }
+    .track {
+      border: 1px solid #ccc;
+      padding: 15px;
+      margin: 15px 0;
+      background: #f9f9f9;
+    }
+    h3 {
+      margin-top: 0;
+    }
+    button {
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>מחשבון משכנתא - מסלולים ולוח שפיצר</h1>
+
+  <div id="tracks"></div>
+
+  <button onclick="addTrack()">➕ הוסף מסלול</button>
+  <button onclick="calculateAll()">חשב את כל המסלולים</button>
+  <button onclick="downloadAllExcel()">📥 הורד את כל הטבלאות לאקסל</button>
+
+  <div id="results"></div>
+
+  <div class="summary" id="overallSummary" style="display: none;">
+    <p>💰 סה"כ קרן: <span id="overallPrincipal"></span> ₪</p>
+    <p>📈 סה"כ ריבית: <span id="overallInterest"></span> ₪</p>
+    <p>📊 סה"כ החזר: <span id="overallPayment"></span> ₪</p>
+  </div>
+
+<script>
+  let trackCount = 0;
+
+  function addTrack() {
+    const container = document.getElementById("tracks");
+    const div = document.createElement("div");
+    div.className = "track";
+    div.innerHTML = `
+  <h3>מסלול ${trackCount + 1}</h3>
+  <label>סכום (₪): <input type="number" class="amount" min="0" step="1000" placeholder="לדוגמה: 300000"></label>
+  <label>סוג מסלול:
+    <select class="type" onchange="handleTypeChange(this, ${trackCount})">
+      <option value="fixedzmoda">קבועה צמודה</option>
+      <option value="fixednozmoda">קבועה לא צמודה</option>
+      <option value="variable">משתנה צמודה כל 5 שנים</option>
+      <option value="variable">משתנה לא צמודה כל 5 שנים</option>
+    </select>
+  </label>
+  <label>שנים: <input type="number" class="years" min="1" step="1" placeholder="לדוגמה: 20" oninput="handleYearsChange(${trackCount})"></label>
+  <div class="rates-container" id="rates-${trackCount}">
+    <label>ריבית שנתית (%): <input type="number" class="rate" min="0" step="0.01" placeholder="לדוגמה: 3.5"></label>
+  </div>
+  <label>מדד (%): <input type="number" class="madad" min="0" step="0.01" placeholder="לדוגמה: 1.5"></label>
+`;
+
+    container.appendChild(div);
+    trackCount++;
+  }
+function handleTypeChange(selectElem, trackId) {
+  const type = selectElem.value;
+  const yearsInput = selectElem.closest(".track").querySelector(".years");
+  const years = parseInt(yearsInput.value) || 0;
+  updateRatesFields(trackId, type, years);
+}
+
+function handleYearsChange(trackId) {
+  const track = document.querySelectorAll(".track")[trackId];
+  const type = track.querySelector(".type").value;
+  const years = parseInt(track.querySelector(".years").value) || 0;
+  updateRatesFields(trackId, type, years);
+}
+
+function updateRatesFields(trackId, type, years) {
+  const container = document.getElementById(`rates-${trackId}`);
+  container.innerHTML = "";
+
+  if (type === "variable") {
+    const periods = Math.ceil(years / 5);
+    for (let i = 0; i < periods; i++) {
+      container.innerHTML += `<label>ריבית לתקופה ${i + 1} (%): <input type="number" class="rate-variable" data-period="${i}" min="0" step="0.01" placeholder="לדוגמה: 3.5"></label>`;
+    }
+  } else {
+    container.innerHTML = `<label>ריבית שנתית (%): <input type="number" class="rate" min="0" step="0.01" placeholder="לדוגמה: 3.5"></label>`;
+  }
+}
+
+  // חישוב שפיצר לתקופה קבועה
+  function calculateSpitzerTable(amount, monthlyRate, months) {
+    let balance = amount;
+    
+    let principalSum = 0, interestSum = 0;
+    let payment ;
+    let rows = [];
+    for (let i = 1; i <= months; i++) {
+      payment = balance * monthlyRate / (1 - Math.pow(1 + monthlyRate, -((months-i)+1)));
+      let interest = balance * monthlyRate;
+      let principal = payment - interest;
+      balance -= principal;
+      principalSum += principal;
+      interestSum += interest;
+      rows.push({
+        month: i,
+        payment,
+        interest,
+        principal,
+        balance: balance > 0 ? balance : 0,
+      });
+    }
+    return { principalSum, interestSum, payment, rows };
+  }
+function calculateSpitzerTableZmoda(amount, monthlyRate, months , madad) {
+    let balance = amount;
+    let hazmada = madad ;
+    hazmada = hazmada/100/12+1;
+    balance = balance * hazmada;
+    let principalSum = 0, interestSum = 0;
+    let payment ;
+    let rows = [];
+    for (let i = 1; i <= months; i++) {
+      payment = balance * monthlyRate / (1 - Math.pow(1 + monthlyRate, -((months-i)+1)));
+      let interest = balance * monthlyRate;
+      let principal = payment - interest;
+      balance -= principal;
+      balance = balance * hazmada;
+      principalSum += principal;
+      interestSum += interest;
+      rows.push({
+        month: i,
+        payment,
+        interest,
+        principal,
+        balance: balance > 0 ? balance : 0,
+      });
+    }
+    return { principalSum, interestSum, payment, rows };
+  }
+  function calculateVariableTableZmoda(amount, monthlyRate, months , rates , madad) {
+    let balance = amount;
+    let hazmada = madad ;
+    hazmada = hazmada/100/12+1;
+    balance = balance * hazmada;
+    let principalSum = 0, interestSum = 0;
+    let payment ;
+    let rows = [];
+    
+    console.log("aa monthlyRate",monthlyRate)
+    for (let i = 1; i <= months; i++) {
+      console.log("aa rates",rates)
+    let newMonthlyRate ;
+    if (i <= 60 )
+    {
+      console.log("bb rates",rates)
+      newMonthlyRate = rates[0];
+      newMonthlyRate = newMonthlyRate /100/12;
+    }
+    else if (i <= 120)
+    {
+      newMonthlyRate = rates[1];
+      newMonthlyRate = newMonthlyRate /100/12;
+    }
+    else if(i<= 180) {
+      newMonthlyRate = rates[2] ;
+      newMonthlyRate = newMonthlyRate /100/12;
+    } 
+    else if(i <= 240)
+    {
+      newMonthlyRate = rates[3] ;
+      newMonthlyRate = newMonthlyRate /100/12;
+    }
+    else if (i<=300)
+    {
+      newMonthlyRate = rates[4];
+      newMonthlyRate = newMonthlyRate /100/12;
+    }
+    else if (i <= 360)
+    {
+      newMonthlyRate = rates[5];
+      newMonthlyRate = newMonthlyRate /100/12;
+    }
+    
+    monthlyRate = newMonthlyRate;
+     
+      payment = balance * monthlyRate / (1 - Math.pow(1 + monthlyRate, -((months-i)+1)));
+      let interest = balance * monthlyRate;
+      let principal = payment - interest;
+      balance -= principal;
+      balance = balance * hazmada;
+      principalSum += principal;
+      interestSum += interest;
+      rows.push({
+        month: i,
+        payment,
+        interest,
+        principal,
+        balance: balance > 0 ? balance : 0,
+      });
+    }
+    return { principalSum, interestSum, payment, rows };
+  }
+  // חישוב משתנה כל 5 שנים לאורך כל התקופה
+  function calculateVariableTable(amount, baseAnnualRate, totalYears) {
+    const periodYears = 5; // משנים את הריבית כל 5 שנים
+    let balance = amount;
+    let monthCounter = 1;
+    let principalSum = 0;
+    let interestSum = 0;
+    let rows = [];
+    let first = true ;
+    while (monthCounter <= totalYears * 12 && balance > 0.01) {
+      let currentPeriodIndex = Math.floor((monthCounter - 1) / (periodYears * 12));
+      // לדוגמה: הריבית נשארת קבועה, אפשר להוסיף לוגיקה לשינוי ריבית לפי תקופה
+      let currentAnnualRate = baseAnnualRate;
+
+      let monthsLeftInPeriod = (periodYears * 12) - ((monthCounter - 1) % (periodYears * 12));
+      console.log("monthsLeftInPeriod " ,monthsLeftInPeriod)
+      let monthsLeftTotal = (totalYears * 12) - (monthCounter - 1);
+      console.log("monthsLeftTotal " , monthsLeftTotal)
+      let monthsToCalculate;
+      if(first)
+    {
+      monthsToCalculate = monthsLeftTotal;
+      first=false;
+    }
+    else{
+     monthsToCalculate = Math.min(monthsLeftInPeriod, monthsLeftTotal);
+    }
+      
+      console.log("monthsToCalculate " , monthsToCalculate)
+
+      let monthlyRate = currentAnnualRate / 12;
+      const payment = balance * monthlyRate / (1 - Math.pow(1 + monthlyRate, -monthsToCalculate));
+
+      for (let i = 0; i < monthsToCalculate; i++) {
+        if (balance <= 0.01) break;
+
+        let interest = balance * monthlyRate;
+        let principal = payment - interest;
+        balance -= principal;
+
+        principalSum += principal;
+        interestSum += interest;
+
+        rows.push({
+          month: monthCounter,
+          payment,
+          interest,
+          principal,
+          balance: balance > 0 ? balance : 0,
+        });
+
+        monthCounter++;
+        console.log(monthCounter ,totalYears * 12 , balance)
+      }
+    }
+    console.log(rows)
+    return { principalSum, interestSum, rows };
+  }
+
+  function calculateAll() {
+    const results = document.getElementById("results");
+    results.innerHTML = "";
+    let totalPrincipal = 0, totalInterest = 0;
+
+    document.getElementById("overallSummary").style.display = "none";
+
+    document.querySelectorAll(".track").forEach((track, index) => {
+      const amount = parseFloat(track.querySelector(".amount").value) || 0;
+     // const annualRate = (parseFloat(track.querySelector(".rate").value) || 0) / 100;
+      const years = parseInt(track.querySelector(".years").value) || 0;
+      const type = track.querySelector(".type").value;
+      const madad = track.querySelector(".madad").value ;
+      let rateInputs = track.querySelectorAll(".rate-variable");
+      let rates = [];
+
+      if (rateInputs.length > 0) {
+        rateInputs.forEach(input => {
+          const r = parseFloat(input.value);
+          if (!isNaN(r)) rates.push(r);
+        });
+      } else {
+        const fixedRate = parseFloat(track.querySelector(".rate")?.value);
+        rates.push(isNaN(fixedRate) ? 0 : fixedRate);
+      }
+
+      if (amount <= 0 || rates[0] <= 0 || years <= 0) {
+        alert(`נא למלא נתונים תקינים במסלול ${index + 1}`);
+        return;
+      }
+
+      const section = document.createElement("div");
+      let principalSum = 0, interestSum = 0;
+      console.log("rates",rates);
+      if (type === "fixednozmoda") {
+        const monthlyRate = rates[0] /100/ 12;
+        const result = calculateSpitzerTable(amount, monthlyRate, years * 12);
+        principalSum = result.principalSum;
+        interestSum = result.interestSum;
+        renderTable(section, years * 12, rates[0] / 12, amount, result, index + 1, "קבועה");
+      } else if(type === "fixedzmoda")
+      {
+        const monthlyRate = rates[0] /100/ 12;
+        const result = calculateSpitzerTableZmoda(amount, monthlyRate, years * 12,madad);
+        principalSum = result.principalSum;
+        interestSum = result.interestSum;
+        renderTable(section, years * 12, rates[0] / 12, amount, result, index + 1, "קבועה");
+      }
+      else {
+        // משתנה
+        const result = calculateVariableTableZmoda(amount, rates[0]/100/12, years*12,rates , madad);
+        console.log(result)
+        principalSum = result.principalSum;
+        interestSum = result.interestSum;
+        renderTableVariable(section, result.rows, index + 1);
+      }
+
+      totalPrincipal += principalSum;
+      totalInterest += interestSum;
+
+      results.appendChild(section);
+    });
+
+    if (totalPrincipal === 0 && totalInterest === 0) {
+      document.getElementById("overallSummary").style.display = "none";
+      return;
+    }
+
+    document.getElementById("overallPrincipal").innerText = totalPrincipal.toFixed(2);
+    document.getElementById("overallInterest").innerText = totalInterest.toFixed(2);
+    document.getElementById("overallPayment").innerText = (totalPrincipal + totalInterest).toFixed(2);
+    document.getElementById("overallSummary").style.display = "block";
+  }
+
+  function renderTable(section, months, monthlyRate, amount, sums, trackNo, typeLabel) {
+    const table = document.createElement("table");
+    const thead = document.createElement("thead");
+    thead.innerHTML = `
+      <tr><th>חודש</th><th>תשלום</th><th>ריבית</th><th>קרן</th><th>יתרה</th></tr>
+    `;
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    sums.rows.forEach(data => {
+      const row = tbody.insertRow();
+      row.insertCell().innerText = data.month;
+      row.insertCell().innerText = data.payment.toFixed(2);
+      row.insertCell().innerText = data.interest.toFixed(2);
+      row.insertCell().innerText = data.principal.toFixed(2);
+      row.insertCell().innerText = data.balance.toFixed(2);
+    });
+    table.appendChild(tbody);
+    section.innerHTML = `<h3>📄 לוח שפיצר (${typeLabel}) - מסלול ${trackNo}</h3>`;
+    section.appendChild(table);
+    section.innerHTML += `<div class="summary">סה"כ קרן: ${sums.principalSum.toFixed(2)} ₪ | סה"כ ריבית: ${sums.interestSum.toFixed(2)} ₪ | סה"כ החזר: ${(sums.principalSum + sums.interestSum).toFixed(2)} ₪</div>`;
+  }
+
+  function renderTableVariable(section, rows, trackNo) {
+    const table = document.createElement("table");
+    const thead = document.createElement("thead");
+    thead.innerHTML = `
+      <tr><th>חודש</th><th>תשלום</th><th>ריבית</th><th>קרן</th><th>יתרה</th></tr>
+    `;
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    rows.forEach(data => {
+      const row = tbody.insertRow();
+      row.insertCell().innerText = data.month;
+      row.insertCell().innerText = data.payment.toFixed(2);
+      row.insertCell().innerText = data.interest.toFixed(2);
+      row.insertCell().innerText = data.principal.toFixed(2);
+      row.insertCell().innerText = data.balance.toFixed(2);
+    });
+    table.appendChild(tbody);
+
+    section.innerHTML = `<h3>📄 לוח שפיצר (משתנה) - מסלול ${trackNo}</h3>`;
+    section.appendChild(table);
+    let principalSum = rows.reduce((sum, r) => sum + r.principal, 0);
+    let interestSum = rows.reduce((sum, r) => sum + r.interest, 0);
+    section.innerHTML += `<div class="summary">סה"כ קרן: ${principalSum.toFixed(2)} ₪ | סה"כ ריבית: ${interestSum.toFixed(2)} ₪ | סה"כ החזר: ${(principalSum + interestSum).toFixed(2)} ₪</div>`;
+  }
+
+  function downloadAllExcel() {
+    const tables = document.querySelectorAll("table");
+    if (tables.length === 0) {
+      alert("אין טבלאות להורדה - תחילה יש לחשב את המסלולים");
+      return;
+    }
+    const wb = XLSX.utils.book_new();
+    tables.forEach((table, index) => {
+      const ws = XLSX.utils.table_to_sheet(table);
+      XLSX.utils.book_append_sheet(wb, ws, `מסלול ${index + 1}`);
+    });
+    XLSX.writeFile(wb, "luach_spitzer_tracks.xlsx");
+  }
+
+  // הוספת מסלול ראשון כברירת מחדל
+  addTrack();
+</script>
+
+</body>
+</html>
