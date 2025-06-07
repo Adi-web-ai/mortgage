@@ -81,9 +81,9 @@
   <label>סכום (₪): <input type="number" class="amount" min="0" step="1000" placeholder="לדוגמה: 300000"></label>
   <label>סוג מסלול:
     <select class="type" onchange="handleTypeChange(this, ${trackCount})">
-      <option value="fixedzmoda">קבועה צמודה</option>
       <option value="fixednozmoda">קבועה לא צמודה</option>
-      <option value="variable">משתנה צמודה כל 5 שנים</option>
+      <option value="fixedzmoda">קבועה צמודה</option>
+      <option value="variablezmoda">משתנה צמודה כל 5 שנים</option>
       <option value="variable">משתנה לא צמודה כל 5 שנים</option>
     </select>
   </label>
@@ -91,7 +91,7 @@
   <div class="rates-container" id="rates-${trackCount}">
     <label>ריבית שנתית (%): <input type="number" class="rate" min="0" step="0.01" placeholder="לדוגמה: 3.5"></label>
   </div>
-  <label>מדד (%): <input type="number" class="madad" min="0" step="0.01" placeholder="לדוגמה: 1.5"></label>
+  
 `;
 
     container.appendChild(div);
@@ -115,13 +115,16 @@ function updateRatesFields(trackId, type, years) {
   const container = document.getElementById(`rates-${trackId}`);
   container.innerHTML = "";
 
-  if (type === "variable") {
+  if (type === "variable" || type === "variablezmoda") {
     const periods = Math.ceil(years / 5);
     for (let i = 0; i < periods; i++) {
       container.innerHTML += `<label>ריבית לתקופה ${i + 1} (%): <input type="number" class="rate-variable" data-period="${i}" min="0" step="0.01" placeholder="לדוגמה: 3.5"></label>`;
     }
   } else {
     container.innerHTML = `<label>ריבית שנתית (%): <input type="number" class="rate" min="0" step="0.01" placeholder="לדוגמה: 3.5"></label>`;
+  }
+  if (type === "fixedzmoda" || type === "variablezmoda"){
+    container.innerHTML +=`<label>מדד (%): <input type="number" class="madad" min="0" step="0.01" placeholder="לדוגמה: 1.5"></label>`
   }
 }
 
@@ -175,6 +178,7 @@ function calculateSpitzerTableZmoda(amount, monthlyRate, months , madad) {
     }
     return { principalSum, interestSum, payment, rows };
   }
+  // חישוב משתנה צמודה כל 5 שנים לאורך כל התקופה
   function calculateVariableTableZmoda(amount, monthlyRate, months , rates , madad) {
     let balance = amount;
     let hazmada = madad ;
@@ -238,64 +242,72 @@ function calculateSpitzerTableZmoda(amount, monthlyRate, months , madad) {
     }
     return { principalSum, interestSum, payment, rows };
   }
+
   // חישוב משתנה כל 5 שנים לאורך כל התקופה
-  function calculateVariableTable(amount, baseAnnualRate, totalYears) {
-    const periodYears = 5; // משנים את הריבית כל 5 שנים
+  function calculateVariableTable(amount, monthlyRate, months , rates ) {
     let balance = amount;
-    let monthCounter = 1;
-    let principalSum = 0;
-    let interestSum = 0;
+   
+    
+    let principalSum = 0, interestSum = 0;
+    let payment ;
     let rows = [];
-    let first = true ;
-    while (monthCounter <= totalYears * 12 && balance > 0.01) {
-      let currentPeriodIndex = Math.floor((monthCounter - 1) / (periodYears * 12));
-      // לדוגמה: הריבית נשארת קבועה, אפשר להוסיף לוגיקה לשינוי ריבית לפי תקופה
-      let currentAnnualRate = baseAnnualRate;
-
-      let monthsLeftInPeriod = (periodYears * 12) - ((monthCounter - 1) % (periodYears * 12));
-      console.log("monthsLeftInPeriod " ,monthsLeftInPeriod)
-      let monthsLeftTotal = (totalYears * 12) - (monthCounter - 1);
-      console.log("monthsLeftTotal " , monthsLeftTotal)
-      let monthsToCalculate;
-      if(first)
+    
+    console.log("aa monthlyRate",monthlyRate)
+    for (let i = 1; i <= months; i++) {
+      console.log("aa rates",rates)
+    let newMonthlyRate ;
+    if (i <= 60 )
     {
-      monthsToCalculate = monthsLeftTotal;
-      first=false;
+      console.log("bb rates",rates)
+      newMonthlyRate = rates[0];
+      newMonthlyRate = newMonthlyRate /100/12;
     }
-    else{
-     monthsToCalculate = Math.min(monthsLeftInPeriod, monthsLeftTotal);
+    else if (i <= 120)
+    {
+      newMonthlyRate = rates[1];
+      newMonthlyRate = newMonthlyRate /100/12;
     }
+    else if(i<= 180) {
+      newMonthlyRate = rates[2] ;
+      newMonthlyRate = newMonthlyRate /100/12;
+    } 
+    else if(i <= 240)
+    {
+      newMonthlyRate = rates[3] ;
+      newMonthlyRate = newMonthlyRate /100/12;
+    }
+    else if (i<=300)
+    {
+      newMonthlyRate = rates[4];
+      newMonthlyRate = newMonthlyRate /100/12;
+    }
+    else if (i <= 360)
+    {
+      newMonthlyRate = rates[5];
+      newMonthlyRate = newMonthlyRate /100/12;
+    }
+    
+    monthlyRate = newMonthlyRate;
+     
+      payment = balance * monthlyRate / (1 - Math.pow(1 + monthlyRate, -((months-i)+1)));
+      let interest = balance * monthlyRate;
+      let principal = payment - interest;
+      balance -= principal;
       
-      console.log("monthsToCalculate " , monthsToCalculate)
-
-      let monthlyRate = currentAnnualRate / 12;
-      const payment = balance * monthlyRate / (1 - Math.pow(1 + monthlyRate, -monthsToCalculate));
-
-      for (let i = 0; i < monthsToCalculate; i++) {
-        if (balance <= 0.01) break;
-
-        let interest = balance * monthlyRate;
-        let principal = payment - interest;
-        balance -= principal;
-
-        principalSum += principal;
-        interestSum += interest;
-
-        rows.push({
-          month: monthCounter,
-          payment,
-          interest,
-          principal,
-          balance: balance > 0 ? balance : 0,
-        });
-
-        monthCounter++;
-        console.log(monthCounter ,totalYears * 12 , balance)
-      }
+      principalSum += principal;
+      interestSum += interest;
+      rows.push({
+        month: i,
+        payment,
+        interest,
+        principal,
+        balance: balance > 0 ? balance : 0,
+      });
     }
-    console.log(rows)
-    return { principalSum, interestSum, rows };
+    return { principalSum, interestSum, payment, rows };
   }
+  
+  
 
   function calculateAll() {
     const results = document.getElementById("results");
@@ -309,7 +321,7 @@ function calculateSpitzerTableZmoda(amount, monthlyRate, months , madad) {
      // const annualRate = (parseFloat(track.querySelector(".rate").value) || 0) / 100;
       const years = parseInt(track.querySelector(".years").value) || 0;
       const type = track.querySelector(".type").value;
-      const madad = track.querySelector(".madad").value ;
+      
       let rateInputs = track.querySelectorAll(".rate-variable");
       let rates = [];
 
@@ -340,14 +352,23 @@ function calculateSpitzerTableZmoda(amount, monthlyRate, months , madad) {
       } else if(type === "fixedzmoda")
       {
         const monthlyRate = rates[0] /100/ 12;
+        const madad = track.querySelector(".madad").value ;
         const result = calculateSpitzerTableZmoda(amount, monthlyRate, years * 12,madad);
         principalSum = result.principalSum;
         interestSum = result.interestSum;
         renderTable(section, years * 12, rates[0] / 12, amount, result, index + 1, "קבועה");
       }
-      else {
+      else if (type === "variablezmoda"){
         // משתנה
+        const madad = track.querySelector(".madad").value ;
         const result = calculateVariableTableZmoda(amount, rates[0]/100/12, years*12,rates , madad);
+        console.log(result)
+        principalSum = result.principalSum;
+        interestSum = result.interestSum;
+        renderTableVariable(section, result.rows, index + 1);
+      }else if (type === "variable"){
+        // משתנה
+        const result = calculateVariableTable(amount, rates[0]/100/12, years*12,rates );
         console.log(result)
         principalSum = result.principalSum;
         interestSum = result.interestSum;
