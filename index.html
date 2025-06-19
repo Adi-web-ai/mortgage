@@ -61,14 +61,14 @@
   <button onclick="calculateAll()">חשב את כל המסלולים</button>
   <button onclick="downloadAllExcel()">📥 הורד את כל הטבלאות לאקסל</button>
 
-  <div id="results"></div>
+  
 
   <div class="summary" id="overallSummary" style="display: none;">
     <p>💰 סה"כ קרן: <span id="overallPrincipal"></span> ₪</p>
     <p>📈 סה"כ ריבית: <span id="overallInterest"></span> ₪</p>
     <p>📊 סה"כ החזר: <span id="overallPayment"></span> ₪</p>
   </div>
-
+<div id="results"></div>
 <script>
   let trackCount = 0;
 
@@ -139,7 +139,7 @@ function updateRatesFields(trackId, type, years) {
       payment = balance * monthlyRate / (1 - Math.pow(1 + monthlyRate, -((months-i)+1)));
       let interest = balance * monthlyRate;
       let principal = payment - interest;
-      balance -= principal;
+      
       principalSum += principal;
       interestSum += interest;
       rows.push({
@@ -149,6 +149,7 @@ function updateRatesFields(trackId, type, years) {
         principal,
         balance: balance > 0 ? balance : 0,
       });
+      balance -= principal;
     }
     return { principalSum, interestSum, payment, rows };
   }
@@ -164,8 +165,8 @@ function calculateSpitzerTableZmoda(amount, monthlyRate, months , madad) {
       payment = balance * monthlyRate / (1 - Math.pow(1 + monthlyRate, -((months-i)+1)));
       let interest = balance * monthlyRate;
       let principal = payment - interest;
-      balance -= principal;
-      balance = balance * hazmada;
+      
+      
       principalSum += principal;
       interestSum += interest;
       rows.push({
@@ -175,6 +176,8 @@ function calculateSpitzerTableZmoda(amount, monthlyRate, months , madad) {
         principal,
         balance: balance > 0 ? balance : 0,
       });
+      balance -= principal;
+      balance = balance * hazmada;
     }
     return { principalSum, interestSum, payment, rows };
   }
@@ -228,8 +231,7 @@ function calculateSpitzerTableZmoda(amount, monthlyRate, months , madad) {
       payment = balance * monthlyRate / (1 - Math.pow(1 + monthlyRate, -((months-i)+1)));
       let interest = balance * monthlyRate;
       let principal = payment - interest;
-      balance -= principal;
-      balance = balance * hazmada;
+      
       principalSum += principal;
       interestSum += interest;
       rows.push({
@@ -239,6 +241,8 @@ function calculateSpitzerTableZmoda(amount, monthlyRate, months , madad) {
         principal,
         balance: balance > 0 ? balance : 0,
       });
+      balance -= principal;
+      balance = balance * hazmada;
     }
     return { principalSum, interestSum, payment, rows };
   }
@@ -292,7 +296,7 @@ function calculateSpitzerTableZmoda(amount, monthlyRate, months , madad) {
       payment = balance * monthlyRate / (1 - Math.pow(1 + monthlyRate, -((months-i)+1)));
       let interest = balance * monthlyRate;
       let principal = payment - interest;
-      balance -= principal;
+      
       
       principalSum += principal;
       interestSum += interest;
@@ -303,6 +307,7 @@ function calculateSpitzerTableZmoda(amount, monthlyRate, months , madad) {
         principal,
         balance: balance > 0 ? balance : 0,
       });
+      balance -= principal;
     }
     return { principalSum, interestSum, payment, rows };
   }
