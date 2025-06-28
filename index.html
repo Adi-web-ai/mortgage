@@ -49,6 +49,30 @@
     button {
       cursor: pointer;
     }
+ .table-container {
+  border: 1px solid #ccc;
+  margin: 10px 0;
+  padding: 10px;
+}
+
+.table-scroll {
+  max-height: 400px; /* גובה גלילה */
+  overflow-y: auto;
+  margin-top: 10px;
+  display: none; /* מתחיל מוסתר */
+}
+
+.toggle-button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  cursor: pointer;
+  border-radius: 5px;
+  margin-bottom: 10px;
+}
+
+
   </style>
 </head>
 <body>
@@ -397,55 +421,123 @@ function calculateSpitzerTableZmoda(amount, monthlyRate, months , madad) {
     document.getElementById("overallSummary").style.display = "block";
   }
 
-  function renderTable(section, months, monthlyRate, amount, sums, trackNo, typeLabel) {
-    const table = document.createElement("table");
-    const thead = document.createElement("thead");
-    thead.innerHTML = `
-      <tr><th>חודש</th><th>תשלום</th><th>ריבית</th><th>קרן</th><th>יתרה</th></tr>
-    `;
-    table.appendChild(thead);
 
-    const tbody = document.createElement("tbody");
-    sums.rows.forEach(data => {
-      const row = tbody.insertRow();
-      row.insertCell().innerText = data.month;
-      row.insertCell().innerText = data.payment.toFixed(2);
-      row.insertCell().innerText = data.interest.toFixed(2);
-      row.insertCell().innerText = data.principal.toFixed(2);
-      row.insertCell().innerText = data.balance.toFixed(2);
-    });
-    table.appendChild(tbody);
-    section.innerHTML = `<h3>📄 לוח שפיצר (${typeLabel}) - מסלול ${trackNo}</h3>`;
-    section.appendChild(table);
-    section.innerHTML += `<div class="summary">סה"כ קרן: ${sums.principalSum.toFixed(2)} ₪ | סה"כ ריבית: ${sums.interestSum.toFixed(2)} ₪ | סה"כ החזר: ${(sums.principalSum + sums.interestSum).toFixed(2)} ₪</div>`;
+function renderTable(section, months, monthlyRate, amount, sums, trackNo, typeLabel) {
+  let container = document.createElement("div");
+  let toggleButton = document.createElement("button");
+  container.className = "table-container";
+
+  
+  toggleButton.className = "toggle-button";
+  toggleButton.innerText = "הצג טבלה";
+
+  let tableWrapper = document.createElement("div");
+  tableWrapper.className = "table-scroll";
+
+
+
+  
+
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  thead.innerHTML = `<tr><th>חודש</th><th>תשלום</th><th>ריבית</th><th>קרן</th><th>יתרה</th></tr>`;
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  sums.rows.forEach(data => {
+    const row = tbody.insertRow();
+    row.insertCell().innerText = data.month;
+    row.insertCell().innerText = data.payment.toFixed(2);
+    row.insertCell().innerText = data.interest.toFixed(2);
+    row.insertCell().innerText = data.principal.toFixed(2);
+    row.insertCell().innerText = data.balance.toFixed(2);
+  });
+  table.appendChild(tbody);
+
+  tableWrapper.appendChild(table);
+  tableWrapper.style.display = "block";
+  
+
+  container.innerHTML = `<h3>📄 לוח שפיצר (${typeLabel}) - מסלול ${trackNo}</h3>`;
+  
+  container.innerHTML += `<div class="summary">סה"כ קרן: ${sums.principalSum.toFixed(2)} ₪ | סה"כ ריבית: ${sums.interestSum.toFixed(2)} ₪ | סה"כ החזר: ${(sums.principalSum + sums.interestSum).toFixed(2)} ₪</div>`;
+
+container.appendChild(toggleButton);
+  container.appendChild(tableWrapper);
+
+  section.appendChild(container);
+  console.log(container);
+  console.log("toggleButton",toggleButton);
+  
+  toggleButton.addEventListener("click", () => {
+  console.log("out")
+  toggleButton.innerText = "הסתר טבלה";
+  if (tableWrapper.style.display === "none") {
+    tableWrapper.style.display = "block";
+    toggleButton.innerText = "הסתר טבלה";
+    console.log("block")
+  } else if(tableWrapper.style.display === "block") {
+    tableWrapper.style.display = "none";
+    toggleButton.innerText = "הצג טבלה";
+    console.log("none")
   }
+});
+  
+}
 
-  function renderTableVariable(section, rows, trackNo) {
-    const table = document.createElement("table");
-    const thead = document.createElement("thead");
-    thead.innerHTML = `
-      <tr><th>חודש</th><th>תשלום</th><th>ריבית</th><th>קרן</th><th>יתרה</th></tr>
-    `;
-    table.appendChild(thead);
+function renderTableVariable(section, rows, trackNo) {
+  const container = document.createElement("div");
+  container.className = "table-container";
 
-    const tbody = document.createElement("tbody");
-    rows.forEach(data => {
-      const row = tbody.insertRow();
-      row.insertCell().innerText = data.month;
-      row.insertCell().innerText = data.payment.toFixed(2);
-      row.insertCell().innerText = data.interest.toFixed(2);
-      row.insertCell().innerText = data.principal.toFixed(2);
-      row.insertCell().innerText = data.balance.toFixed(2);
-    });
-    table.appendChild(tbody);
+  const toggleButton = document.createElement("button");
+  toggleButton.className = "toggle-button";
+  toggleButton.innerText = "הסתר טבלה";
+  toggleButton.onclick = function () {
+    if (tableWrapper.style.display === "none") {
+      tableWrapper.style.display = "block";
+      toggleButton.innerText = "הסתר טבלה";
+    } else {
+      tableWrapper.style.display = "none";
+      toggleButton.innerText = "הצג טבלה";
+    }
+  };
 
-    section.innerHTML = `<h3>📄 לוח שפיצר (משתנה) - מסלול ${trackNo}</h3>`;
-    section.appendChild(table);
-    let principalSum = rows.reduce((sum, r) => sum + r.principal, 0);
-    let interestSum = rows.reduce((sum, r) => sum + r.interest, 0);
-    section.innerHTML += `<div class="summary">סה"כ קרן: ${principalSum.toFixed(2)} ₪ | סה"כ ריבית: ${interestSum.toFixed(2)} ₪ | סה"כ החזר: ${(principalSum + interestSum).toFixed(2)} ₪</div>`;
-  }
+  const tableWrapper = document.createElement("div");
+  tableWrapper.className = "table-scroll";
 
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  thead.innerHTML = `<tr><th>חודש</th><th>תשלום</th><th>ריבית</th><th>קרן</th><th>יתרה</th></tr>`;
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  rows.forEach(data => {
+    const row = tbody.insertRow();
+    row.insertCell().innerText = data.month;
+    row.insertCell().innerText = data.payment.toFixed(2);
+    row.insertCell().innerText = data.interest.toFixed(2);
+    row.insertCell().innerText = data.principal.toFixed(2);
+    row.insertCell().innerText = data.balance.toFixed(2);
+  });
+  table.appendChild(tbody);
+
+  tableWrapper.appendChild(table);
+
+  let principalSum = rows.reduce((sum, r) => sum + r.principal, 0);
+  let interestSum = rows.reduce((sum, r) => sum + r.interest, 0);
+
+  container.innerHTML = `<h3>📄 לוח שפיצר (משתנה) - מסלול ${trackNo}</h3>`;
+  container.innerHTML += `<div class="summary">סה"כ קרן: ${principalSum.toFixed(2)} ₪ | סה"כ ריבית: ${interestSum.toFixed(2)} ₪ | סה"כ החזר: ${(principalSum + interestSum).toFixed(2)} ₪</div>`;
+  container.appendChild(toggleButton);
+  container.appendChild(tableWrapper);
+  
+
+  section.appendChild(container);
+  tableWrapper.style.display = "block";
+}
+
+
+  
   function downloadAllExcel() {
     const tables = document.querySelectorAll("table");
     if (tables.length === 0) {
